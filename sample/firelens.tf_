@@ -2,11 +2,11 @@
 # S3
 # -----------------------------------------------------------------------
 resource "aws_s3_bucket" "firelensconf" {
-  bucket        = "${var.product}-${var.env}-firelensconf-s3"
+  bucket        = "${local.product}-${local.env}-firelensconf-s3"
   force_destroy = false
 
   tags = {
-    Name = "${var.product}-${var.env}-firelensconf-s3"
+    Name = "${local.product}-${local.env}-firelensconf-s3"
   }
 }
 

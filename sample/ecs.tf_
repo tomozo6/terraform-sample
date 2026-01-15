@@ -1,5 +1,5 @@
 resource "aws_ecs_cluster" "main" {
-  name = "${var.product}-${var.env}-main-ecs-cluster"
+  name = "${local.product}-${local.env}-main-ecs-cluster"
 
   setting {
     name  = "containerInsights"
@@ -7,6 +7,6 @@ resource "aws_ecs_cluster" "main" {
   }
 
   tags = {
-    Name = "${var.product}-${var.env}-main-ecs-cluster"
+    Name = "${local.product}-${local.env}-main-ecs-cluster"
   }
 }

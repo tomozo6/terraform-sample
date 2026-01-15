@@ -2,8 +2,8 @@
 # main
 # -------------------------------------------------------
 resource "aws_acm_certificate" "main" {
-  domain_name               = var.main_domain_name
-  subject_alternative_names = ["*.${var.main_domain_name}"]
+  domain_name               = local.product_fqdn
+  subject_alternative_names = ["*.${local.product_fqdn}"]
   validation_method         = "DNS"
 }
 
@@ -21,7 +21,7 @@ resource "aws_route53_record" "main_for_acm" {
   records         = [each.value.record]
   ttl             = 60
   type            = each.value.type
-  zone_id         = aws_route53_zone.roadsync.zone_id
+  zone_id         = data.aws_route53_zone.base.zone_id
 }
 
 resource "aws_acm_certificate_validation" "main" {
@@ -32,7 +32,7 @@ resource "aws_acm_certificate_validation" "main" {
 # us-east-1 (CloudFront用)
 resource "aws_acm_certificate" "main_us_east_1" {
   provider                  = aws.us-east-1
-  domain_name               = var.main_domain_name
-  subject_alternative_names = ["*.${var.main_domain_name}"]
+  domain_name               = local.product_fqdn
+  subject_alternative_names = ["*.${local.product_fqdn}"]
   validation_method         = "DNS"
 }

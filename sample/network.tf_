@@ -2,10 +2,10 @@
 # VPC & Internet Gateway
 # ----------------------------------------------------------
 resource "aws_vpc" "main" {
-  cidr_block = var.vpc_cidr_block
+  cidr_block = local.vpc_cidr_block
 
   tags = {
-    "Name" = "${var.product}-${var.env}-main-vpc"
+    "Name" = "${local.product}-${local.env}-main-vpc"
   }
 }
 
@@ -13,7 +13,7 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    "Name" = "${var.product}-${var.env}-main-igw"
+    "Name" = "${local.product}-${local.env}-main-igw"
   }
 }
 
@@ -21,14 +21,14 @@ resource "aws_internet_gateway" "main" {
 # Subnet (Public)
 # ----------------------------------------------------------
 resource "aws_subnet" "public" {
-  count = length(var.azs)
+  count = length(local.azs)
 
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.public_subnets[count.index]
-  availability_zone = var.azs[count.index]
+  cidr_block        = local.public_subnets[count.index]
+  availability_zone = local.azs[count.index]
 
   tags = {
-    Name = "${var.product}-${var.env}-main-subnet-public-${format("%02d", count.index)}"
+    Name = "${local.product}-${local.env}-main-subnet-public-${format("%02d", count.index)}"
   }
 }
 
@@ -37,7 +37,7 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.product}-${var.env}-main-rtb-public"
+    Name = "${local.product}-${local.env}-main-rtb-public"
   }
 }
 
@@ -58,14 +58,14 @@ resource "aws_route_table_association" "public" {
 # Subnet (Private)
 # ----------------------------------------------------------
 resource "aws_subnet" "private" {
-  count = length(var.azs)
+  count = length(local.azs)
 
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnets[count.index]
-  availability_zone = var.azs[count.index]
+  cidr_block        = local.private_subnets[count.index]
+  availability_zone = local.azs[count.index]
 
   tags = {
-    Name = "${var.product}-${var.env}-main-subnet-private-${format("%02d", count.index)}"
+    Name = "${local.product}-${local.env}-main-subnet-private-${format("%02d", count.index)}"
   }
 }
 
@@ -75,7 +75,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.product}-${var.env}-main-rtb-private-${format("%02d", count.index)}"
+    Name = "${local.product}-${local.env}-main-rtb-private-${format("%02d", count.index)}"
   }
 }
 
@@ -103,7 +103,7 @@ resource "aws_eip" "main" {
   domain = "vpc"
 
   tags = {
-    Name = "${var.product}-${var.env}-main-natgw-eip-${format("%02d", count.index)}"
+    Name = "${local.product}-${local.env}-main-natgw-eip-${format("%02d", count.index)}"
   }
 }
 
@@ -114,7 +114,7 @@ resource "aws_nat_gateway" "main" {
   subnet_id     = aws_subnet.public[count.index].id
 
   tags = {
-    Name = "${var.product}-${var.env}-main-natgw-${format("%02d", count.index)}"
+    Name = "${local.product}-${local.env}-main-natgw-${format("%02d", count.index)}"
   }
 }
 
@@ -124,10 +124,10 @@ resource "aws_nat_gateway" "main" {
 # s3
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = aws_vpc.main.id
-  service_name = "com.amazonaws.${var.region}.s3"
+  service_name = "com.amazonaws.${local.region}.s3"
 
   tags = {
-    Name = "${var.product}-${var.env}-main-vpce-s3"
+    Name = "${local.product}-${local.env}-main-vpce-s3"
   }
 }
 
@@ -141,10 +141,10 @@ resource "aws_vpc_endpoint_route_table_association" "s3" {
 # dynamodb
 resource "aws_vpc_endpoint" "dynamodb" {
   vpc_id       = aws_vpc.main.id
-  service_name = "com.amazonaws.${var.region}.dynamodb"
+  service_name = "com.amazonaws.${local.region}.dynamodb"
 
   tags = {
-    Name = "${var.product}-${var.env}-main-vpce-dynamodb"
+    Name = "${local.product}-${local.env}-main-vpce-dynamodb"
   }
 }
 

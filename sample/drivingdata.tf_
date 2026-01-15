@@ -2,7 +2,7 @@
 # Kinesis Data Stream
 # -----------------------------------------------------------------------
 resource "aws_kinesis_stream" "drivingdata" {
-  name             = "${var.product}-${var.env}-drivingdata-kds"
+  name             = "${local.product}-${local.env}-drivingdata-kds"
   shard_count      = 1
   retention_period = 24
   encryption_type  = "KMS"
@@ -18,7 +18,7 @@ resource "aws_kinesis_stream" "drivingdata" {
   }
 
   tags = {
-    Name = "${var.product}-${var.env}-drivingdata-kds"
+    Name = "${local.product}-${local.env}-drivingdata-kds"
   }
 }
 
@@ -27,11 +27,11 @@ resource "aws_kinesis_stream" "drivingdata" {
 # S3
 # -----------------------------------------------------------------------
 resource "aws_s3_bucket" "drivingdata" {
-  bucket        = "${var.product}-${var.env}-drivingdata-s3"
+  bucket        = "${local.product}-${local.env}-drivingdata-s3"
   force_destroy = false
 
   tags = {
-    Name = "${var.product}-${var.env}-drivingdata-s3"
+    Name = "${local.product}-${local.env}-drivingdata-s3"
   }
 }
 
@@ -58,7 +58,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "drivingdata" {
 #          Service = "cloudtrail.amazonaws.com"
 #        }
 #        Action   = "s3:PutObject"
-#        Resource = "arn:aws:s3:::${var.product}-${var.env}-logs-s3/cloudtrail/AWSLogs/${var.account_id}/*"
+#        Resource = "arn:aws:s3:::${local.product}-${local.env}-logs-s3/cloudtrail/AWSLogs/${local.account_id}/*"
 #        Condition = {
 #          StringEquals = {
 #            "s3:x-amz-acl" = "bucket-owner-full-control"
@@ -72,11 +72,11 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "drivingdata" {
 #          AWS = data.aws_elb_service_account.current.arn
 #        }
 #        Action   = "s3:PutObject"
-#        Resource = "arn:aws:s3:::${var.product}-${var.env}-logs-s3/alb/AWSLogs/${var.account_id}/*"
+#        Resource = "arn:aws:s3:::${local.product}-${local.env}-logs-s3/alb/AWSLogs/${local.account_id}/*"
 #        Condition = {
 #          StringEquals = {
 #            "s3:x-amz-acl"      = "bucket-owner-full-control"
-#            "aws:SourceAccount" = var.account_id
+#            "aws:SourceAccount" = local.account_id
 #          }
 #        }
 #      }

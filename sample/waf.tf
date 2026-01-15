@@ -18,8 +18,8 @@ resource "aws_wafv2_ip_set" "honda" {
 # ---------------------------------------------------------
 resource "aws_wafv2_web_acl" "main" {
   provider    = aws.us-east-1
-  name        = "${var.product}-${var.env}-main-waf-acl"
-  description = "${var.product}-${var.env}-main-waf-acl"
+  name        = "${local.product}-${local.env}-main-waf-acl"
+  description = "${local.product}-${local.env}-main-waf-acl"
   scope       = "CLOUDFRONT"
 
   default_action {

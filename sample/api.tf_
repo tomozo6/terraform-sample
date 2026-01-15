@@ -24,7 +24,7 @@ resource "aws_ecr_repository" "sasaki" {
 # ---------------------------------------------------------
 #tfsec:ignore:aws-elb-alb-not-public
 resource "aws_lb" "api" {
-  name                             = "${var.product}-${var.env}-api-alb"
+  name                             = "${local.product}-${local.env}-api-alb"
   load_balancer_type               = "application"
   internal                         = false
   security_groups                  = [aws_security_group.api_alb.id]
@@ -39,11 +39,11 @@ resource "aws_lb" "api" {
   access_logs {
     enabled = true
     bucket  = aws_s3_bucket.logs.bucket
-    prefix  = "alb/${var.product}-${var.env}-api-alb"
+    prefix  = "alb/${local.product}-${local.env}-api-alb"
   }
 
   tags = {
-    Name = "${var.product}-${var.env}-api-alb"
+    Name = "${local.product}-${local.env}-api-alb"
   }
 }
 
@@ -64,11 +64,11 @@ resource "aws_lb_listener" "api_https" {
 # Security Group
 # ---------------------------
 resource "aws_security_group" "api_alb" {
-  name   = "${var.product}-${var.env}-api-alb-sg"
+  name   = "${local.product}-${local.env}-api-alb-sg"
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.product}-${var.env}-api-alb-sg"
+    Name = "${local.product}-${local.env}-api-alb-sg"
   }
 }
 
@@ -93,19 +93,19 @@ resource "aws_vpc_security_group_egress_rule" "api_alb_to_all" {
 # Target Group
 # ---------------------------------------------------------
 resource "aws_lb_target_group" "api" {
-  name             = "${var.product}-${var.env}-api-tg"
+  name             = "${local.product}-${local.env}-api-tg"
   vpc_id           = aws_vpc.main.id
   port             = 50051
   protocol         = "HTTP"
   protocol_version = "GRPC"
   target_type      = "ip"
 
-  #  deregistration_delay               = var.deregistration_delay
-  #  slow_start                         = var.slow_start
-  #  proxy_protocol_v2                  = var.proxy_protocol_v2
-  #  lambda_multi_value_headers_enabled = var.lambda_multi_value_headers_enabled
-  #  load_balancing_algorithm_type      = var.load_balancing_algorithm_type
-  #  preserve_client_ip                 = var.preserve_client_ip
+  #  deregistration_delay               = local.deregistration_delay
+  #  slow_start                         = local.slow_start
+  #  proxy_protocol_v2                  = local.proxy_protocol_v2
+  #  lambda_multi_value_headers_enabled = local.lambda_multi_value_headers_enabled
+  #  load_balancing_algorithm_type      = local.load_balancing_algorithm_type
+  #  preserve_client_ip                 = local.preserve_client_ip
 
   health_check {
     enabled             = true
@@ -119,7 +119,7 @@ resource "aws_lb_target_group" "api" {
   }
 
   tags = {
-    Name = "${var.product}-${var.env}-api-alb"
+    Name = "${local.product}-${local.env}-api-alb"
   }
 
   lifecycle {
@@ -131,7 +131,7 @@ resource "aws_lb_target_group" "api" {
 # ---------------------------------------------------------
 # IAM(execution)
 resource "aws_iam_role" "api_ecs_task_execution" {
-  name = "${var.product}-${var.env}-api-task-execution-role"
+  name = "${local.product}-${local.env}-api-task-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -156,7 +156,7 @@ resource "aws_iam_role_policy_attachment" "api_ecs_task_execution" {
 
 # IAM(task)
 resource "aws_iam_role" "api_ecs_task" {
-  name = "${var.product}-${var.env}-api-task-role"
+  name = "${local.product}-${local.env}-api-task-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -173,7 +173,7 @@ resource "aws_iam_role" "api_ecs_task" {
 }
 
 resource "aws_iam_policy" "api_ecs_task" {
-  name = "${var.product}-${var.env}-api-task-policy"
+  name = "${local.product}-${local.env}-api-task-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -234,11 +234,11 @@ resource "aws_iam_role_policy_attachment" "api_ecs_task" {
 
 # Security Group
 resource "aws_security_group" "api_ecs" {
-  name   = "${var.product}-${var.env}-api-ecs-sg"
+  name   = "${local.product}-${local.env}-api-ecs-sg"
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.product}-${var.env}-api-ecs-sg"
+    Name = "${local.product}-${local.env}-api-ecs-sg"
   }
 }
 

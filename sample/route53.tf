@@ -1,3 +1,3 @@
-resource "aws_route53_zone" "roadsync" {
-  name = var.main_domain_name
+data "aws_route53_zone" "base" {
+  name = local.base_fqdn
 }

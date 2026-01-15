@@ -6,11 +6,22 @@ data "aws_ec2_managed_prefix_list" "cloudfront" {
 }
 
 # ---------------------------------------------------------
+# OAC
+# ---------------------------------------------------------
+resource "aws_cloudfront_origin_access_control" "main" {
+  name                              = "${local.product}-${local.env}-cf-oac"
+  description                       = ""
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# ---------------------------------------------------------
 # Route53
 # ---------------------------------------------------------
 resource "aws_route53_record" "main" {
-  zone_id = aws_route53_zone.roadsync.zone_id
-  name    = var.main_domain_name
+  zone_id = data.aws_route53_zone.base.zone_id
+  name    = local.product_fqdn
   type    = "A"
 
   alias {
@@ -25,60 +36,83 @@ resource "aws_route53_record" "main" {
 # ---------------------------------------------------------
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
-  aliases             = [var.main_domain_name]
+  aliases             = [local.product_fqdn]
   is_ipv6_enabled     = false
   comment             = ""
   default_root_object = "index.html"
-  price_class         = "PriceClass_All"
+  price_class         = "PriceClass_200"
   http_version        = "http2"
   web_acl_id          = aws_wafv2_web_acl.main.arn
   wait_for_deployment = false
 
-  logging_config {
-    include_cookies = false
-    bucket          = aws_s3_bucket.logs.bucket_domain_name
-    prefix          = "cf/${var.main_domain_name}"
-  }
+  #  logging_config {
+  #    include_cookies = false
+  #    bucket          = aws_s3_bucket.logs.bucket_domain_name
+  #    prefix          = "cf/${local.main_domain_name}"
+  #  }
+  #  
 
   origin {
-    domain_name = aws_lb.api.dns_name
-    origin_id   = aws_lb.api.name
+    domain_name = aws_s3_bucket.web.bucket_regional_domain_name
+    origin_id   = aws_s3_bucket.web.bucket
 
-    custom_origin_config {
-      http_port  = "80"
-      https_port = "443"
-      #ip_address_type          = "dualstack"
-      origin_protocol_policy   = "https-only"
-      origin_ssl_protocols     = ["TLSv1.2"]
-      origin_keepalive_timeout = 5
-      origin_read_timeout      = 30
-    }
+    #    s3_origin_config {
+    #      # OACを使う場合はここは空でOK（OAIは不要）
+    #      origin_access_identity = null
+    #    }
 
+    origin_access_control_id = aws_cloudfront_origin_access_control.main.id
   }
+
 
   default_cache_behavior {
-    target_origin_id       = aws_lb.api.name
-    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    target_origin_id       = aws_s3_bucket.web.bucket
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
     compress               = true
-    viewer_protocol_policy = "https-only"
-    min_ttl                = 0
-    default_ttl            = 0
-    max_ttl                = 0
-
-    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3"
-    grpc_config {
-      enabled = true
-    }
-
-    #    forwarded_values {
-    #      query_string = true
-    #      cookies {
-    #        forward = "all"
-    #      }
-    #    }
+    cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   }
+
+  #  origin {
+  #    domain_name = aws_lb.api.dns_name
+  #    origin_id   = aws_lb.api.name
+  #
+  #    custom_origin_config {
+  #      http_port  = "80"
+  #      https_port = "443"
+  #      #ip_address_type          = "dualstack"
+  #      origin_protocol_policy   = "https-only"
+  #      origin_ssl_protocols     = ["TLSv1.2"]
+  #      origin_keepalive_timeout = 5
+  #      origin_read_timeout      = 30
+  #    }
+  #
+  #  }
+
+  #  default_cache_behavior {
+  #    target_origin_id       = aws_lb.api.name
+  #    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+  #    cached_methods         = ["GET", "HEAD"]
+  #    compress               = true
+  #    viewer_protocol_policy = "https-only"
+  #    min_ttl                = 0
+  #    default_ttl            = 0
+  #    max_ttl                = 0
+  #
+  #    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+  #    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3"
+  #    grpc_config {
+  #      enabled = true
+  #    }
+  #
+  #    #    forwarded_values {
+  #    #      query_string = true
+  #    #      cookies {
+  #    #        forward = "all"
+  #    #      }
+  #    #    }
+  #  }
 
   restrictions {
     geo_restriction {
@@ -92,19 +126,24 @@ resource "aws_cloudfront_distribution" "main" {
     minimum_protocol_version       = "TLSv1.2_2021"
     ssl_support_method             = "sni-only"
   }
+
+  depends_on = [
+    aws_s3_bucket_public_access_block.web,
+    aws_s3_bucket_ownership_controls.web
+  ]
 }
 
 # ---------------------------------------------------------
 # Logging
 # ---------------------------------------------------------
 #resource "aws_cloudwatch_log_delivery_source" "cf" {
-#  name         = "${var.product}-${var.env}-cloudfront-cwlds"
+#  name         = "${local.product}-${local.env}-cloudfront-cwlds"
 #  log_type     = "ACCESS_LOGS"
 #  resource_arn = aws_cloudfront_distribution.main.arn
 #}
 #
 #resource "aws_cloudwatch_log_delivery_destination" "cf" {
-#  name          = "${var.product}-${var.env}-cloudfront-cwldd"
+#  name          = "${local.product}-${local.env}-cloudfront-cwldd"
 #  output_format = "json"
 #
 #  delivery_destination_configuration {
