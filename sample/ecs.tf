@@ -10,3 +10,7 @@ resource "aws_ecs_cluster" "main" {
     Name = "${local.product}-${local.env}-main-ecs-cluster"
   }
 }
+
+
+
+

@@ -1,25 +1,4 @@
 # ---------------------------------------------------------
-# ECR
-# ---------------------------------------------------------
-resource "aws_ecr_repository" "api" {
-  name                 = "api"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-}
-
-resource "aws_ecr_repository" "sasaki" {
-  name                 = "sasaki"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-}
-
-# ---------------------------------------------------------
 # ALB
 # ---------------------------------------------------------
 #tfsec:ignore:aws-elb-alb-not-public
@@ -34,13 +13,6 @@ resource "aws_lb" "api" {
   enable_deletion_protection       = false
   enable_http2                     = true
   drop_invalid_header_fields       = true
-  #  ip_address_type                  = "dualstack"
-
-  access_logs {
-    enabled = true
-    bucket  = aws_s3_bucket.logs.bucket
-    prefix  = "alb/${local.product}-${local.env}-api-alb"
-  }
 
   tags = {
     Name = "${local.product}-${local.env}-api-alb"
@@ -60,9 +32,9 @@ resource "aws_lb_listener" "api_https" {
   }
 }
 
-# ---------------------------
-# Security Group
-# ---------------------------
+# ---------------------------------------------------------
+# ALB-SG
+# ---------------------------------------------------------
 resource "aws_security_group" "api_alb" {
   name   = "${local.product}-${local.env}-api-alb-sg"
   vpc_id = aws_vpc.main.id
@@ -89,32 +61,25 @@ resource "aws_vpc_security_group_egress_rule" "api_alb_to_all" {
 }
 
 # ---------------------------------------------------------
-#tfsec:ignore:aws-elb-alb-not-public:
 # Target Group
 # ---------------------------------------------------------
+#tfsec:ignore:aws-elb-alb-not-public:
 resource "aws_lb_target_group" "api" {
-  name             = "${local.product}-${local.env}-api-tg"
-  vpc_id           = aws_vpc.main.id
-  port             = 50051
-  protocol         = "HTTP"
-  protocol_version = "GRPC"
-  target_type      = "ip"
-
-  #  deregistration_delay               = local.deregistration_delay
-  #  slow_start                         = local.slow_start
-  #  proxy_protocol_v2                  = local.proxy_protocol_v2
-  #  lambda_multi_value_headers_enabled = local.lambda_multi_value_headers_enabled
-  #  load_balancing_algorithm_type      = local.load_balancing_algorithm_type
-  #  preserve_client_ip                 = local.preserve_client_ip
+  name     = "${local.product}-${local.env}-api-tg"
+  vpc_id   = aws_vpc.main.id
+  port     = 80
+  protocol = "HTTP"
+  # protocol_version = "HTTP2"
+  target_type = "ip"
 
   health_check {
     enabled             = true
     port                = "traffic-port"
-    path                = "/grpc.health.v1.Health/Check"
-    matcher             = "0"
+    path                = "/"
+    matcher             = "200"
     interval            = 30
     timeout             = 5
-    healthy_threshold   = 5
+    healthy_threshold   = 2
     unhealthy_threshold = 2
   }
 
@@ -126,10 +91,92 @@ resource "aws_lb_target_group" "api" {
     create_before_destroy = true
   }
 }
+
 # ---------------------------------------------------------
-# ECS
+# ECS-タスク定義
 # ---------------------------------------------------------
-# IAM(execution)
+data "aws_ecs_task_definition" "api" {
+  task_definition = aws_ecs_task_definition.api.family
+}
+
+resource "aws_ecs_task_definition" "api" {
+  family                   = "${local.product}-${local.env}-api-ecs-task-definition"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.api_ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.api_ecs_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name      = "nginx"
+      image     = "nginx:stable-alpine"
+      essential = true
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+          protocol      = "tcp"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "${aws_cloudwatch_log_group.api_ecs.name}"
+          awslogs-region        = "ap-northeast-1"
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
+# ---------------------------------------------------------
+# ECS-Service
+# ---------------------------------------------------------
+resource "aws_ecs_service" "api" {
+  name                   = "${local.product}-${local.env}-api-ecs-service"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = data.aws_ecs_task_definition.api.arn
+  desired_count          = 1
+  launch_type            = "FARGATE"
+  platform_version       = "1.4.0"
+  enable_execute_command = true
+
+  network_configuration {
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.api_ecs.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.api.arn
+    container_name   = "nginx"
+    container_port   = 80
+  }
+
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
+  health_check_grace_period_seconds  = null
+
+  #  lifecycle {
+  #    ignore_changes = [
+  #      desired_count
+  #    ]
+  #  }
+}
+
+# ---------------------------------------------------------
+# ECS-IAM
+# ---------------------------------------------------------
+# execution
 resource "aws_iam_role" "api_ecs_task_execution" {
   name = "${local.product}-${local.env}-api-task-execution-role"
 
@@ -154,7 +201,7 @@ resource "aws_iam_role_policy_attachment" "api_ecs_task_execution" {
   policy_arn = each.value
 }
 
-# IAM(task)
+# task
 resource "aws_iam_role" "api_ecs_task" {
   name = "${local.product}-${local.env}-api-task-role"
 
@@ -190,29 +237,6 @@ resource "aws_iam_policy" "api_ecs_task" {
         Resource = ["*"]
       },
       {
-        Sid    = "AllowKinesisPut"
-        Effect = "Allow"
-        Action = [
-          "kinesis:PutRecord",
-          "kinesis:PutRecords"
-        ]
-        Resource = [
-          aws_kinesis_stream.drivingdata.arn
-        ]
-      },
-      {
-        Sid    = "AllowFirelensConfGet"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:GetBucketLocation"
-        ]
-        Resource = [
-          aws_s3_bucket.firelensconf.arn,
-          "${aws_s3_bucket.firelensconf.arn}/*",
-        ]
-      },
-      {
         Sid    = "AllowCloudWatchLogs"
         Effect = "Allow"
         Action = [
@@ -232,7 +256,9 @@ resource "aws_iam_role_policy_attachment" "api_ecs_task" {
   policy_arn = aws_iam_policy.api_ecs_task.arn
 }
 
-# Security Group
+# ---------------------------------------------------------
+# ECS-SG
+# ---------------------------------------------------------
 resource "aws_security_group" "api_ecs" {
   name   = "${local.product}-${local.env}-api-ecs-sg"
   vpc_id = aws_vpc.main.id
@@ -247,8 +273,8 @@ resource "aws_vpc_security_group_ingress_rule" "api_ecs_from_alb" {
   referenced_security_group_id = aws_security_group.api_alb.id
   description                  = aws_security_group.api_alb.name
   ip_protocol                  = "tcp"
-  from_port                    = 50051
-  to_port                      = 50051
+  from_port                    = 80
+  to_port                      = 80
 }
 
 resource "aws_vpc_security_group_egress_rule" "api_ecs_to_all" {
@@ -256,4 +282,12 @@ resource "aws_vpc_security_group_egress_rule" "api_ecs_to_all" {
   description       = "Allow to All"
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
+}
+
+# ---------------------------------------------------------
+# ECS-Log
+# ---------------------------------------------------------
+resource "aws_cloudwatch_log_group" "api_ecs" {
+  name              = "/ecs/${local.product}/${local.env}/api"
+  retention_in_days = 14
 }
