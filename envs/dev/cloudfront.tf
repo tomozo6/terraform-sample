@@ -42,7 +42,7 @@ resource "aws_cloudfront_distribution" "main" {
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
   http_version        = "http2"
-  #web_acl_id          = aws_wafv2_web_acl.main.arn
+  web_acl_id          = aws_wafv2_web_acl.main.arn
   wait_for_deployment = false
 
   #  logging_config {

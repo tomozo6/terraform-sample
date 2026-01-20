@@ -1,16 +1,13 @@
 # ---------------------------------------------------------
 # IP Set
 # ---------------------------------------------------------
-resource "aws_wafv2_ip_set" "honda" {
+resource "aws_wafv2_ip_set" "office" {
   provider           = aws.us-east-1
-  name               = "honda"
-  description        = "hobda"
+  name               = "office"
+  description        = "office"
   scope              = "CLOUDFRONT"
   ip_address_version = "IPV4"
-
-  addresses = [
-    "103.113.246.0/24",
-  ]
+  addresses          = local.office_addresses
 }
 
 # ---------------------------------------------------------
@@ -44,7 +41,7 @@ resource "aws_wafv2_web_acl" "main" {
     statement {
       # IPSetを参照するステートメント
       ip_set_reference_statement {
-        arn = aws_wafv2_ip_set.honda.arn
+        arn = aws_wafv2_ip_set.office.arn
       }
     }
 
